@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #12151c;
+    --ink-2: #1b1f29;
+    --paper: #ede9e0;
+    --paper-dim: #a9a59c;
+    --focus: #e2903d;
+    --focus-dim: #6b4a26;
+    --rest: #4fac9f;
+    --rest-dim: #2b4d48;
+    --line: #2a2f3a;
+    --ring-track: #262b35;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    overflow-x: hidden;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .mode-row {
+    display: flex;
+    gap: 6px;
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px;
+  }
+
+  .mode-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--paper-dim);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    padding: 9px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.25s ease, color 0.25s ease;
+  }
+
+  .mode-btn.active {
+    background: var(--focus);
+    color: #1a1105;
+  }
+
+  .mode-btn[data-mode="rest"].active,
+  .mode-btn[data-mode="longrest"].active {
+    background: var(--rest);
+    color: #06211d;
+  }
+
+  .ring-wrap {
+    position: relative;
+    width: 300px;
+    height: 300px;
+  }
+
+  svg { transform: rotate(-90deg); }
+
+  .ring-track {
+    fill: none;
+    stroke: var(--ring-track);
+    stroke-width: 3;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke: var(--focus);
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.4s ease;
+  }
+
+  .ring-progress.rest { stroke: var(--rest); }
+
+  .tick {
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 56px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .label {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 20px;
+    color: var(--paper-dim);
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--ink-2);
+    color: var(--paper);
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    border-radius: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, transform 0.1s ease;
+  }
+
+  .btn:hover { border-color: var(--paper-dim); }
+  .btn:active { transform: scale(0.96); }
+
+  .btn.primary {
+    background: var(--focus);
+    color: #1a1105;
+    border-color: var(--focus);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 28px;
+    letter-spacing: 0.03em;
+  }
+
+  .btn.primary.rest { background: var(--rest); color: #1b6b5f80; border-color: var(--rest); }
+
+  .btn:focus-visible, .mode-btn:focus-visible {
+    outline: 2px solid var(--paper);
+    outline-offset: 2px;
+  }
+
+  .sessions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pip {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+    background: var(--ring-track);
+    transition: background 0.3s ease;
+  }
+
+  .pip.done { background: var(--focus); }
+
+  .caption {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+  }
+
+  .settings {
+    display: flex;
+    gap: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--paper-dim);
+  }
+
+  .settings label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+  .settings input {
+    width: 46px;
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    text-align: center;
+    border-radius: 6px;
+    padding: 4px 2px;
+  }
+
+  .settings input:focus-visible {
+    outline: 2px solid var(--paper);
+    outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ring-progress { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="mode-row" role="tablist" aria-label="Timer mode">
+    <button class="mode-btn active" data-mode="focus" role="tab" aria-selected="true">Focus</button>
+    <button class="mode-btn" data-mode="rest" role="tab" aria-selected="false">Short break</button>
+    <button class="mode-btn" data-mode="longrest" role="tab" aria-selected="false">Long break</button>
+  </div>
+
+  <div class="ring-wrap">
+    <svg width="300" height="300" viewBox="0 0 300 300">
+      <circle class="ring-track" cx="150" cy="150" r="138"></circle>
+      <circle id="ringProgress" class="ring-progress" cx="150" cy="150" r="138"
+        stroke-dasharray="867.08" stroke-dashoffset="0"></circle>
+    </svg>
+    <div class="center">
+      <div class="time" id="timeDisplay">25:00</div>
+      <div class="label" id="stateLabel">time to focus</div>
+    </div>
+  </div>
+
+  <div class="sessions" id="sessionPips" aria-label="Completed focus sessions"></div>
+
+  <div class="controls">
+    <button class="btn" id="resetBtn" aria-label="Reset timer">reset</button>
+    <button class="btn primary" id="startBtn">start</button>
+    <button class="btn" id="skipBtn" aria-label="Skip to next">skip</button>
+    <button class="btn" id="musicBtn">🎵 Music ON</button>
+  </div>
+
+  <div class="settings">
+    <label>Focus (min)
+      <input type="number" id="focusInput" min="1" max="90" value="25">
+    </label>
+    <label>Short (min)
+      <input type="number" id="restInput" min="1" max="30" value="5">
+    </label>
+    <label>Long (min)
+      <input type="number" id="longInput" min="1" max="60" value="15">
+    </label>
+  </div>
+
+  <div class="caption" id="caption">session 1 of 4</div>
+
+</div>
+
+<audio id="water_drops" preload="auto">
+  <source src="boons_freak-rain-sound-188158.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+(function () {
+  const RADIUS = 138;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+  const ring = document.getElementById('ringProgress');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const stateLabel = document.getElementById('stateLabel');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const skipBtn = document.getElementById('skipBtn');
+  const musicBtn = document.getElementById('musicBtn');
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  const sessionPips = document.getElementById('sessionPips');
+  const caption = document.getElementById('caption');
+  const focusInput = document.getElementById('focusInput');
+  const restInput = document.getElementById('restInput');
+  const longInput = document.getElementById('longInput');
+  const water_drops = document.getElementById('water_drops');
+
+  ring.style.strokeDasharray = CIRCUMFERENCE;
+
+  const SESSIONS_PER_CYCLE = 4;
+
+  let durations = {
+    focus: 25 * 60,
+    rest: 5 * 60,
+    longrest: 15 * 60
+  };
+
+  let mode = 'focus';
+  let secondsLeft = durations.focus;
+  let totalSeconds = durations.focus;
+  let running = false;
+  let intervalId = null;
+  let completedFocusSessions = 0;
+
+  const labels = {
+    focus: 'time to focus',
+    rest: 'short break',
+    longrest: 'long break'
+  };
+
+  function buildPips() {
+    sessionPips.innerHTML = '';
+    for (let i = 0; i < SESSIONS_PER_CYCLE; i++) {
+      const pip = document.createElement('div');
+      pip.className = 'pip';
+      sessionPips.appendChild(pip);
+    }
+  }
+  buildPips();
+
+  function updatePips() {
+    const pips = sessionPips.querySelectorAll('.pip');
+    const doneInCycle = completedFocusSessions % SESSIONS_PER_CYCLE;
+    pips.forEach((pip, i) => {
+      pip.classList.toggle('done', i < doneInCycle);
+    });
+  }
+
+  function formatTime(s) {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = Math.floor(s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
+  }
+
+  function updateDisplay() {
+    timeDisplay.textContent = formatTime(secondsLeft);
+    stateLabel.textContent = labels[mode];
+    const progress = 1 - secondsLeft / totalSeconds;
+    ring.style.strokeDashoffset = CIRCUMFERENCE * progress;
+    ring.classList.toggle('rest', mode !== 'focus');
+    document.title = `${formatTime(secondsLeft)} · ${labels[mode]}`;
+
+    const cyclePos = (completedFocusSessions % SESSIONS_PER_CYCLE) + 1;
+    caption.textContent = mode === 'focus'
+      ? `session ${cyclePos} of ${SESSIONS_PER_CYCLE}`
+      : `after session ${completedFocusSessions}`;
+  }
+
+  function setMode(newMode, resetTime = true) {
+    mode = newMode;
+    modeBtns.forEach(btn => {
+      const isActive = btn.dataset.mode === newMode;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive);
+    });
+    if (resetTime) {
+      secondsLeft = durations[newMode];
+      totalSeconds = durations[newMode];
+    }
+    startBtn.classList.toggle('rest', newMode !== 'focus');
+    updateDisplay();
+  }
+
+  function tick() {
+    secondsLeft -= 1;
+    if (secondsLeft <= 0) {
+      handleComplete();
+      return;
+    }
+    let musicPlaying = false;
+
+musicBtn.addEventListener("click", () => {
+    if (musicPlaying) {
+        water_drops.pause();
+        water_drops.currentTime = 0;
+        musicBtn.textContent = "🎵 Music ON";
+    } else {
+        water_drops.play();
+        musicBtn.textContent = "🔇 Music OFF";
+    }
+
+    musicPlaying = !musicPlaying;
+});
+
+
+
+
+    updateDisplay();
+  }
+
+  function handleComplete() {
+    try { water_drops.currentTime = 0; water_drops.play().catch(() => {}); } catch (e) {}
+
+    if (mode === 'focus') {
+      completedFocusSessions += 1;
+      updatePips();
+      const nextMode = completedFocusSessions % SESSIONS_PER_CYCLE === 0 ? 'longrest' : 'rest';
+      setMode(nextMode);
+    } else {
+      setMode('focus');
+    }
+    pause();
+    updateDisplay();
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    startBtn.textContent = 'pause';
+    intervalId = setInterval(tick, 1000);
+  }
+
+  function pause() {
+    running = false;
+    startBtn.textContent = 'start';
+    clearInterval(intervalId);
+  }
+
+  function toggleStart() {
+    running ? pause() : start();
+  }
+
+  function reset() {
+    pause();
+    secondsLeft = durations[mode];
+    totalSeconds = durations[mode];
+    updateDisplay();
+  }
+
+  function skip() {
+    pause();
+    handleComplete();
+  }
+
+  startBtn.addEventListener('click', toggleStart);
+  resetBtn.addEventListener('click', reset);
+  skipBtn.addEventListener('click', skip);
+
+  modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      pause();
+      setMode(btn.dataset.mode);
+    });
+  });
+
+  function syncDurationsFromInputs() {
+    const focusVal = Math.min(90, Math.max(1, parseInt(focusInput.value, 10) || 25));
+    const restVal = Math.min(30, Math.max(1, parseInt(restInput.value, 10) || 5));
+    const longVal = Math.min(60, Math.max(1, parseInt(longInput.value, 10) || 15));
+    durations.focus = focusVal * 60;
+    durations.rest = restVal * 60;
+    durations.longrest = longVal * 60;
+    if (!running) {
+      secondsLeft = durations[mode];
+      totalSeconds = durations[mode];
+      updateDisplay();
+    }
+  }
+
+  [focusInput, restInput, longInput].forEach(input => {
+    input.addEventListener('change', syncDurationsFromInputs);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+      e.preventDefault();
+      toggleStart();
+    }
+  });
+
+  updateDisplay();
+})();
+</script>
+
+</body>
+</html>
